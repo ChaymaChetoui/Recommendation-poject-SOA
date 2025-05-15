@@ -20,15 +20,6 @@ Fournir des recommandations personnalisées à des utilisateurs en se basant sur
 
 ---
 
-## 🖥️ Frontend
-
-Une page HTML simple (sans framework) permettant de :
-
-✅ Sélectionner un utilisateur ou saisir son identifiant  
-✅ Consulter ses recommandations (affichées avec titre et catégorie)  
-✅ Suivre les clics sur les items (tracking d'activité)  
-✅ Rafraîchir la liste des utilisateurs  
-✅ Avoir un feedback visuel (chargement, erreurs, alertes)
 
 ---
 
@@ -67,7 +58,4 @@ Une page HTML simple (sans framework) permettant de :
 
 ---
 
-## 🧪 Exemple de test avec Postman
-
-### ➤ Récupérer les utilisateurs :
 
