@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Recommandations Personnalisées</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="container py-4">
+    <h3>Recommandations Personnalisées</h3>
+
+    <div class="mb-3">
+      <label for="userId" class="form-label">Nom utilisateur</label>
+      <input
+        type="text"
+        id="userId"
+        class="form-control"
+        placeholder="Entrez un nom d'utilisateur"
+      />
+    </div>
+
+    <button id="btnGet" class="btn btn-primary mb-3">
+      Voir recommandations
+    </button>
+    <span id="spinner" style="display: none">⏳ Chargement...</span>
+
+    <div id="results"></div>
+
+    <hr />
+
+    <h5>Liste des utilisateurs</h5>
+    <ul id="userList" class="list-group mb-4"></ul>
+
+    <script>
+      const graphqlURL = "http://localhost:4000/graphql";
+      const itemServiceURL = "http://localhost:4000/items";
+      const userServiceURL = "http://localhost:4000/users";
+
+      // Afficher recommandations avec détails + tracking clic
+      async function getRecommendations() {
+        const username = document.getElementById("userId").value.trim();
+        const spinner = document.getElementById("spinner");
+        const results = document.getElementById("results");
+        results.innerHTML = "";
+        if (!username) return alert("Entrer un nom d'utilisateur");
+
+        spinner.style.display = "inline-block";
+
+        const query = `
+      query {
+        getRecommendationsByUsername(username: "${username}") {
+          username
+          itemIds
+        }
+      }
+    `;
+
+        try {
+          const res = await fetch(graphqlURL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query }),
+          });
+          const json = await res.json();
+          const data = json.data?.getRecommendationsByUsername;
+
+          if (data?.itemIds?.length > 0) {
+            // Récupérer détails des items
+            const itemsRes = await fetch(itemServiceURL);
+            const allItems = await itemsRes.json();
+
+            const recommendedItems = allItems.filter((item) =>
+              data.itemIds.includes(item.id)
+            );
+
+            results.innerHTML = `
+          <h6>Résultats pour <strong>${data.username}</strong> (${
+              recommendedItems.length
+            } recommandations) :</h6>
+          <ul class="list-group mt-2" id="recommendedItemsList">
+            ${recommendedItems
+              .map(
+                (item) =>
+                  `<li class="list-group-item item-recommendation" data-itemid="${item.id}" style="cursor:pointer;">
+                    <strong>${item.title}</strong> <em>(${item.category})</em>
+                  </li>`
+              )
+              .join("")}
+          </ul>
+        `;
+
+            // Tracking clic sur item
+            document.querySelectorAll(".item-recommendation").forEach((el) => {
+              el.addEventListener("click", () => {
+                const itemId = el.dataset.itemid;
+                trackUserActivity(username, "click_item", itemId);
+                alert(`Vous avez cliqué sur : ${el.textContent.trim()}`);
+              });
+            });
+          } else {
+            results.innerHTML = `<div class="alert alert-warning mt-2">Aucune recommandation trouvée.</div>`;
+          }
+        } catch (err) {
+          results.innerHTML = `<div class="alert alert-danger mt-2">Erreur de requête.</div>`;
+          console.error(err);
+        } finally {
+          spinner.style.display = "none";
+        }
+      }
+
+      // Envoi des événements tracking au backend
+      async function trackUserActivity(username, action, itemId) {
+        try {
+          await fetch("http://localhost:4000/trackActivity", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              username,
+              action,
+              itemId,
+              timestamp: new Date(),
+            }),
+          });
+        } catch (err) {
+          console.error("Erreur tracking activité utilisateur :", err);
+        }
+      }
+
+      // Affichage liste utilisateurs + clic pré-remplissage input
+      function setupUserListClick() {
+        document
+          .querySelectorAll("#userList li.list-group-item")
+          .forEach((li) => {
+            li.style.cursor = "pointer";
+            li.addEventListener("click", () => {
+              const userNameText = li.textContent.split(" (")[0];
+              document.getElementById("userId").value = userNameText;
+            });
+          });
+      }
+
+      async function fetchUsers() {
+        const userList = document.getElementById("userList");
+        userList.innerHTML = "<li class='list-group-item'>Chargement...</li>";
+        try {
+          const res = await fetch(userServiceURL);
+          const users = await res.json();
+          userList.innerHTML = "";
+          users.forEach((user) => {
+            userList.innerHTML += `<li class="list-group-item">${user.name} (${user.email})</li>`;
+          });
+          setupUserListClick();
+        } catch (err) {
+          userList.innerHTML = `<li class="list-group-item text-danger">Erreur chargement utilisateurs</li>`;
+        }
+      }
+
+      document
+        .getElementById("btnGet")
+        .addEventListener("click", getRecommendations);
+
+      // Initial load users
+      fetchUsers();
+    </script>
+  </body>
+</html>
